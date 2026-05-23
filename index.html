@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>INFINIX PRO - 30S FIXED</title>
+    <style>
+        body { background: #000; color: #fff; font-family: sans-serif; text-align: center; padding: 20px; }
+        .win { color: #00ff41; font-weight: bold; }
+        .loss { color: #ff003c; font-weight: bold; }
+        .num-circle { display: inline-block; width: 40px; height: 40px; background: #222; border-radius: 50%; line-height: 40px; margin: 5px; font-weight: bold; border: 1px solid #ffea00; }
+        #mainWrapper { max-width: 400px; margin: 0 auto; background: #05050c; padding: 20px; border-radius: 20px; border: 1px solid #7c3aed; }
+        #timer { font-size: 2rem; font-weight: bold; margin: 10px 0; }
+        #pRes { font-size: 3rem; font-weight: 900; margin: 15px 0; }
+        table { width: 100%; margin-top: 20px; border-collapse: collapse; }
+        th, td { padding: 8px; border-bottom: 1px solid #222; }
+    </style>
+</head>
+<body>
+
+    <div id="mainWrapper">
+        <h2>INFINIX PRO</h2>
+        <div id="stratDisplay">MODE: SYNCING...</div>
+        <div id="timer">00:30</div>
+        <div id="pID">PERIOD: SYNCING...</div>
+        <div id="pRes">---</div>
+        <div id="mLevel">MARTINGALE: LEVEL 1 (1X)</div>
+        
+        <p>▲ OPPOSITE NUMBERS ▲</p>
+        <div id="numRow"></div>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>PERIOD</th>
+                    <th>PRED</th>
+                    <th>RESULT</th>
+                    <th>STATUS</th>
+                </tr>
+            </thead>
+            <tbody id="logs"></tbody>
+        </table>
+    </div>
+
+<script>
+    const API = "https://draw.ar-lottery01.com/WinGo/WinGo_1M/GetHistoryIssuePage.json";
+    let lastP = null, nextP = null, targetNums = [], currentLevel = 1;
+
+    window.onload = () => {
+        syncEngine();
+        setInterval(syncEngine, 2000);
+        startClock();
+    };
+
+    // ⏱️ নিখুঁত ৩০ সেকেন্ডের ফিক্সড টাইমার লজিক
+    function startClock() {
+        setInterval(() => {
+            const seconds = new Date().getSeconds();
+            const rem = 30 - (seconds % 30); // ৩০ সেকেন্ডের লুপ এখানে ফিক্সড
+            document.getElementById('timer').innerText = `00:${rem < 10 ? '0' + rem : rem}`;
+            document.getElementById('timer').style.color = rem <= 5 ? "#ff003c" : "#ffea00";
+        }, 1000);
+    }
+
+    async function syncEngine() {
+        try {
+            const r = await fetch(API + '?t=' + Date.now());
+            const d = await r.json();
+            const top = d.data.list[0];
+            processHybrid(top.issueNumber, parseInt(top.number), d.data.list);
+        } catch (e) {}
+    }
+
+    function processHybrid(p, num, list) {
+        const actual = num >= 5 ? "BIG" : "SMALL";
+        if (lastP !== p) {
+            if (nextP && lastP) {
+                const win = (nextP === actual) || targetNums.includes(num);
+                if(win) { currentLevel = 1; }
+                else { currentLevel++; if(currentLevel > 4) currentLevel = 1; }
+                
+                const multiplier = currentLevel === 1 ? "1X" : (currentLevel === 2 ? "3X" : (currentLevel === 3 ? "9X" : "27X"));
+                document.getElementById('mLevel').innerText = `MARTINGALE: LEVEL ${currentLevel} (${multiplier})`;
+                
+                const row = `<tr><td>${p.slice(-3)}</td><td>${nextP}</td><td>${actual}(${num})</td><td class="${win?'win':'loss'}">${win?'WIN':'LOSS'}</td></tr>`;
+                document.getElementById('logs').innerHTML = row + document.getElementById('logs').innerHTML;
+            }
+            
+            lastP = p;
+            const last5 = list.slice(0, 5).map(x => parseInt(x.number) >= 5 ? "BIG" : "SMALL");
+            const lastNums = list.slice(0, 5).map(x => parseInt(x.number));
+            const stratDisp = document.getElementById('stratDisplay');
+
+            if (last5[0] === last5[1] && last5[1] === last5[2]) {
+                nextP = last5[0]; 
+                stratDisp.innerText = "MODE: DRAGON FOLLOW";
+            } 
+            else {
+                nextP = (last5[0] === "BIG") ? "SMALL" : "BIG";
+                stratDisp.innerText = "MODE: SMART REVERSE";
+            }
+
+            const sum = lastNums.reduce((a, b) => a + b, 0);
+            if (nextP === "BIG") {
+                targetNums = (sum > 20) ? [0, 2] : [1, 3];
+            } else {
+                targetNums = (sum < 25) ? [7, 9] : [6, 8];
+            }
+
+            document.getElementById('pID').innerText = "PERIOD: " + (BigInt(p) + 1n).toString();
+            document.getElementById('pRes').innerText = nextP;
+            document.getElementById('pRes').style.color = nextP === "BIG" ? "#ffea00" : "#00ff41";
+            document.getElementById('numRow').innerHTML = `<div class="num-circle">${targetNums[0]}</div><div class="num-circle">${targetNums[1]}</div>`;
+        }
+    }
+</script>
+</body>
+</html>
